@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule
 import com.mashape.unirest.http.JsonNode
 import com.mashape.unirest.http.Unirest
 import com.mashape.unirest.request.HttpRequestWithBody
+import org.abimon.db4k.objMapper
 import org.abimon.imperator.handle.Imperator
 import org.abimon.imperator.handle.Order
 import org.abimon.imperator.handle.Scout
@@ -35,7 +36,12 @@ fun main(args: Array<String>) {
     val notifly = Notifly()
 }
 
-class Notifly: Scout {
+class Notifly(val config: ServerConfig = run {
+    val configFile = File("config.json")
+    if (!configFile.exists())
+        configFile.writeText("{}")
+    return@run objMapper.readValue(configFile, ServerConfig::class.java)
+}): Scout {
     override fun addAnnouncements(order: Order) {}
 
     override fun getName(): String = "Notifly"
@@ -49,7 +55,6 @@ class Notifly: Scout {
             .enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
             .setSerializationInclusion(JsonInclude.Include.NON_ABSENT)
 
-    val config: ServerConfig
     val mysqlConnectionPool = Pool<Connection>(128)
 
     val imperator = BasicImperator()
@@ -62,11 +67,6 @@ class Notifly: Scout {
     fun getConnection(): PoolableObject<Connection> = mysqlConnectionPool.getOrAddOrWait(60, TimeUnit.SECONDS, { makeConnection() }) as PoolableObject<Connection>
 
     init {
-        val configFile = File("config.json")
-        if (!configFile.exists())
-            configFile.writeText("{}")
-        config = objMapper.readValue(configFile, ServerConfig::class.java)
-
         println(config)
 
         if(!config.userConfigDirectory.exists())
