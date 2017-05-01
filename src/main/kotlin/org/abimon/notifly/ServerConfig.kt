@@ -23,5 +23,8 @@ data class ServerConfig(
         val tumblrConsumerKey: Optional<String> = Optional.empty(),
         val tumblrSecretKey: Optional<String> = Optional.empty(),
 
-        val discordToken: Optional<String> = Optional.empty()
+        val discordToken: Optional<String> = Optional.empty(),
+
+        val websocketAuthorisation: Optional<String> = Optional.empty(),
+        val websocketPort: Int = 8080
 )

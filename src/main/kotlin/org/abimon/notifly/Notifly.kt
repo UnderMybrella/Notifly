@@ -7,14 +7,22 @@ import com.fasterxml.jackson.databind.module.SimpleModule
 import com.mashape.unirest.http.JsonNode
 import com.mashape.unirest.http.Unirest
 import com.mashape.unirest.request.HttpRequestWithBody
+import io.vertx.core.Vertx
+import io.vertx.core.http.HttpServer
+import io.vertx.core.http.ServerWebSocket
 import org.abimon.db4k.objMapper
 import org.abimon.imperator.handle.Imperator
 import org.abimon.imperator.handle.Order
 import org.abimon.imperator.handle.Scout
 import org.abimon.imperator.impl.BasicImperator
+import org.abimon.imperator.impl.BasicSoldier
 import org.abimon.notifly.inputs.DiscordEvents
 import org.abimon.notifly.inputs.RSSFeeds
 import org.abimon.notifly.inputs.TumblrBlogs
+import org.abimon.notifly.orders.DiscordEvent
+import org.abimon.notifly.orders.NewAtomEntry
+import org.abimon.notifly.orders.NewRSSItem
+import org.abimon.notifly.orders.NewTumblrPost
 import org.abimon.notifly.responses.AtomText
 import org.abimon.notifly.responses.AtomTextDeserialiser
 import org.abimon.visi.collections.Pool
@@ -41,7 +49,7 @@ class Notifly(val config: ServerConfig = run {
     if (!configFile.exists())
         configFile.writeText("{}")
     return@run objMapper.readValue(configFile, ServerConfig::class.java)
-}): Scout {
+}) : Scout {
     override fun addAnnouncements(order: Order) {}
 
     override fun getName(): String = "Notifly"
@@ -63,31 +71,59 @@ class Notifly(val config: ServerConfig = run {
     val tumblr: Optional<TumblrBlogs>
     val discord: Optional<DiscordEvents>
 
+    val vertx: Optional<Vertx>
+    val httpServer: Optional<HttpServer>
+    val websocketConnections = ArrayList<ServerWebSocket>()
+
     fun makeConnection(): PoolableObject<Connection> = PoolableObject(DriverManager.getConnection("jdbc:mysql://${config.mysqlServer()}/${config.mysqlDatabase()}?user=${config.mysqlUsername()}&password=${config.mysqlPassword()}&serverTimezone=GMT"))
     fun getConnection(): PoolableObject<Connection> = mysqlConnectionPool.getOrAddOrWait(60, TimeUnit.SECONDS, { makeConnection() }) as PoolableObject<Connection>
 
     init {
         println(config)
 
-        if(!config.userConfigDirectory.exists())
+        if (!config.userConfigDirectory.exists())
             config.userConfigDirectory.mkdirs()
 
-        if(config.rssSupport) {
+        if (config.rssSupport) {
             rss = RSSFeeds(this).asOptional()
-        }
-        else
+        } else
             rss = Optional.empty()
 
-        if(config.tumblrSupport && config.tumblrConsumerKey.isPresent) {
+        if (config.tumblrSupport && config.tumblrConsumerKey.isPresent) {
             tumblr = TumblrBlogs(this).asOptional()
-        }
-        else
+        } else
             tumblr = Optional.empty()
 
-        if(config.discordToken.isPresent)
+        if (config.discordToken.isPresent)
             discord = DiscordEvents(this, config.discordToken()).asOptional()
         else
             discord = Optional.empty()
+
+        if (config.websocketAuthorisation.isPresent) {
+            vertx = Vertx.vertx().asOptional()
+            httpServer = vertx().createHttpServer().asOptional()
+            httpServer().websocketHandler { websocket ->
+                if (!websocket.headers().contains("Authorization") || websocket.headers()["Authorization"] != config.websocketAuthorisation()) {
+                    websocket.reject()
+                } else
+                    websocketConnections.add(websocket)
+            }
+            httpServer().listen(config.websocketPort)
+        } else {
+            vertx = Optional.empty()
+            httpServer = Optional.empty()
+        }
+
+        imperator.hireSoldier(BasicSoldier("Gateway Watcher", listOf()) { order ->
+            websocketConnections.forEach { websocket ->
+                when(order) {
+                    is DiscordEvent -> websocket.writeTextMessage(objMapper.writeValueAsString(JSONObject().put("type", "DISCORD_EVENT").put("data", order)))
+                    is NewAtomEntry -> websocket.writeTextMessage(objMapper.writeValueAsString(JSONObject().put("type", "NEW_ATOM_ENTRY").put("data", JSONObject().put("feed", order.feed).put("item", order.item))))
+                    is NewRSSItem -> websocket.writeTextMessage(objMapper.writeValueAsString(JSONObject().put("type", "NEW_ATOM_ENTRY").put("data", JSONObject().put("feed", order.feed).put("item", order.item))))
+                    is NewTumblrPost -> websocket.writeTextMessage(objMapper.writeValueAsString(JSONObject().put("type", "NEW_TUMBLR_POST").put("data", JSONObject().put("author", order.author).put("post", order.post))))
+                }
+            }
+        })
     }
 
     fun usingMysql(): Boolean = config.mysqlServer.isPresent && config.mysqlDatabase.isPresent && config.mysqlUsername.isPresent && config.mysqlPassword.isPresent
@@ -111,13 +147,16 @@ fun Statement.executeAndClose(sql: String) {
     execute(sql)
     close()
 }
+
 fun Statement.executeQueryAndClose(sql: String): ResultSet {
     closeOnCompletion()
     return executeQuery(sql)
 }
-fun <T: HttpRequestWithBody> T.jsonBody(json: JSONObject): T {
+
+fun <T : HttpRequestWithBody> T.jsonBody(json: JSONObject): T {
     header("Content-Type", "application/json")
     body(json.toString())
     return this
 }
+
 fun JsonNode.toJsonObject(): JSONObject = JSONObject(`object`.toString())

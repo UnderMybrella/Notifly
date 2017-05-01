@@ -48,7 +48,7 @@ dependencies {
 
     compile 'com.github.undermybrella:Visi:65d8d54'
     compile 'com.github.undermybrella:Imperator:7c21cc7'
-    compile 'com.github.undermybrella:Gateway4K:2068f93'
+    compile 'com.github.undermybrella:Gateway4K:7b6d18b'
 
     testCompile group: 'junit', name: 'junit', version: '4.12'
 }
