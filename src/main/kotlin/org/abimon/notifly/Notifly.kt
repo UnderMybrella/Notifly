@@ -121,7 +121,7 @@ class Notifly(val config: ServerConfig = run {
         imperator.hireSoldier(BasicSoldier("Gateway Watcher", listOf()) { order ->
             websocketConnections.forEach { websocket ->
                 when(order) {
-                    is DiscordEvent -> websocket.writeTextMessage(JSONObject().put("type", "DISCORD_EVENT").put("data", JSONObject().put("event", objMapper.writeValueAsString(order.event)).put("private_channels", objMapper.writeValueAsString(order.privateChannels))).toString())
+                    is DiscordEvent -> websocket.writeTextMessage(JSONObject().put("type", "DISCORD_EVENT").put("data", JSONObject().put("event_type", order.event::class.qualifiedName).put("event", objMapper.writeValueAsString(order.event)).put("private_channels", objMapper.writeValueAsString(order.privateChannels))).toString())
                     is NewAtomEntry -> websocket.writeTextMessage(JSONObject().put("type", "NEW_ATOM_ENTRY").put("data", JSONObject().put("feed", objMapper.writeValueAsString(order.feed)).put("item", objMapper.writeValueAsString(order.item))).toString())
                     is NewRSSItem -> websocket.writeTextMessage(JSONObject().put("type", "NEW_ATOM_ENTRY").put("data", JSONObject().put("feed", objMapper.writeValueAsString(order.feed)).put("item", objMapper.writeValueAsString(order.item))).toString())
                     is NewTumblrPost -> websocket.writeTextMessage(JSONObject().put("type", "NEW_TUMBLR_POST").put("data", JSONObject().put("author", objMapper.writeValueAsString(order.author)).put("post", objMapper.writeValueAsString(order.post))).toString())
