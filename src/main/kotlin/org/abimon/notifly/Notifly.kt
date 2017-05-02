@@ -10,7 +10,9 @@ import com.mashape.unirest.request.HttpRequestWithBody
 import io.vertx.core.Vertx
 import io.vertx.core.http.HttpServer
 import io.vertx.core.http.ServerWebSocket
+import org.abimon.db4k.jackson.SnowflakeSerialiser
 import org.abimon.db4k.objMapper
+import org.abimon.db4k.objects.Snowflake
 import org.abimon.imperator.handle.Imperator
 import org.abimon.imperator.handle.Order
 import org.abimon.imperator.handle.Scout
@@ -58,7 +60,7 @@ class Notifly(val config: ServerConfig = run {
 
     val objMapper: ObjectMapper = ObjectMapper()
             .findAndRegisterModules()
-            .registerModule(SimpleModule("LDT").addDeserializer(LocalDateTime::class.java, LDTDeserializer()).addDeserializer(AtomText::class.java, AtomTextDeserialiser()))
+            .registerModule(SimpleModule("LDT").addSerializer(Snowflake::class.java, SnowflakeSerialiser()).addSerializer(LocalDateTime::class.java, LDTSerializer()).addDeserializer(LocalDateTime::class.java, LDTDeserializer()).addDeserializer(AtomText::class.java, AtomTextDeserialiser()))
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
             .setSerializationInclusion(JsonInclude.Include.NON_ABSENT)
