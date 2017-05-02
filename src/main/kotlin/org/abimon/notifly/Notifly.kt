@@ -105,8 +105,12 @@ class Notifly(val config: ServerConfig = run {
             httpServer().websocketHandler { websocket ->
                 if (!websocket.headers().contains("Authorization") || websocket.headers()["Authorization"] != config.websocketAuthorisation()) {
                     websocket.reject()
-                } else
+                } else {
                     websocketConnections.add(websocket)
+                    websocket.closeHandler {
+                        websocketConnections.remove(websocket)
+                    }
+                }
             }
             httpServer().listen(config.websocketPort)
         } else {
