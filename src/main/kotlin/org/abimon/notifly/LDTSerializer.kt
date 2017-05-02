@@ -7,16 +7,13 @@ import com.fasterxml.jackson.databind.JsonDeserializer
 import com.fasterxml.jackson.databind.JsonSerializer
 import com.fasterxml.jackson.databind.SerializerProvider
 import java.time.LocalDateTime
-import java.time.ZoneOffset
-import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatter.*
 import java.time.format.DateTimeFormatterBuilder
-import java.time.format.FormatStyle
 
 class LDTSerializer: JsonSerializer<LocalDateTime>() {
     override fun serialize(value: LocalDateTime, gen: JsonGenerator, serializers: SerializerProvider) {
-        gen.writeString(ZonedDateTime.of(value, ZoneOffset.UTC).format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.FULL)))
+        gen.writeString(value.format(ISO_LOCAL_DATE_TIME))
     }
 }
 
